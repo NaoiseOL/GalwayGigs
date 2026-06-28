@@ -4,11 +4,6 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from playwright.sync_api import sync_playwright
 
-
-# ---------------------------------------------------------------------------
-# Deduplication helpers
-# ---------------------------------------------------------------------------
-
 def normalise_title(title: str) -> str:
     title = title.lower().strip()
     title = re.sub(r'\s+', ' ', title)
@@ -45,11 +40,6 @@ def dedupe_gigs(gigs: list[dict]) -> list[dict]:
             seen.add(key)
             unique.append(gig)
     return unique
-
-
-# ---------------------------------------------------------------------------
-# Scrapers
-# ---------------------------------------------------------------------------
 
 def SongkickScrape():
     gigs = []
@@ -112,16 +102,6 @@ def MonroesScrape():
 
 
 def RoisinDubhScrape():
-    """
-    Roisin Dubh loads events via authenticated API calls.
-    We use Playwright to intercept those JSON responses as they fire,
-    then parse them directly — no HTML scraping needed.
-
-    API returns two types of responses:
-    1. Months list: { success, total, results: [{month, year}, ...] }
-    2. Events per month: { success, total, results: [{id, pagetitle, alias,
-                           event_date_time, name, prices, ...}, ...] }
-    """
     gigs = []
     api_results = []
 
@@ -130,14 +110,11 @@ def RoisinDubhScrape():
         page = browser.new_page()
 
         def handle_response(response):
-            # Capture any JSON response from the roisindubh domain
             if "roisindubh.net" in response.url and response.status == 200:
                 try:
                     data = response.json()
-                    # Only keep responses that have an event results list
                     if isinstance(data.get("results"), list):
                         for item in data["results"]:
-                            # Month-list items only have 'month' and 'year' — skip them
                             if "pagetitle" in item:
                                 api_results.append(item)
                 except Exception:
@@ -150,10 +127,9 @@ def RoisinDubhScrape():
     for event in api_results:
         title = event.get("pagetitle", "").strip()
         alias = event.get("alias", "")
-        raw_date = event.get("event_date_time", "")  # e.g. "2026-06-28T20:00:00"
+        raw_date = event.get("event_date_time", "")
         venue = event.get("name", "Róisín Dubh").strip()
-
-        # Parse ISO datetime -> clean date string
+        
         try:
             dt = datetime.fromisoformat(raw_date)
             date = dt.strftime("%Y-%m-%d")
@@ -224,11 +200,6 @@ def EventbriteGalwayScrape():
             })
 
     return gigs
-
-
-# ---------------------------------------------------------------------------
-# Aggregate entry point
-# ---------------------------------------------------------------------------
 
 def get_all_gigs() -> list[dict]:
     all_gigs = (
